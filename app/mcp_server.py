@@ -1,5 +1,3 @@
-"""Minimal MCP server exposing the same tools used by the agent.
-"""
 from app.tools.sql_tool import lookup_customer_support_data
 from app.tools.policy_tool import search_policy_knowledge
 from app.logger import logger
@@ -27,5 +25,4 @@ def policy_search(query: str) -> dict:
 
 
 if __name__ == "__main__":
-    logger.info("MCP SERVER STARTING...")
-    mcp.run()
+    mcp.run(transport="streamable-http")

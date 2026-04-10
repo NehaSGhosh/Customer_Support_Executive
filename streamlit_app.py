@@ -21,7 +21,7 @@ with st.sidebar:
             st.session_state["query"] = q
 
 query = st.text_area("Enter your question", value=st.session_state.get("query", ""), height=120)
-logger.info(f"User query: {query}")
+logger.debug(f"User query: {query}")
 
 if st.button("Run") and query.strip():
     with st.spinner("Thinking..."):

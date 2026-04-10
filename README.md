@@ -1,119 +1,166 @@
 # Customer Support Multi-Agent System
 
-A practical Generative AI project for the TCS pre-qualification assignment. The system answers customer-support questions over:
-- **Structured data** in SQLite (customers, tickets, refunds)
-- **Unstructured policy PDFs** in a FAISS vector store
-- **Multi-agent orchestration** using LangGraph
-- **MCP server** exposing tools for SQL lookup and policy retrieval
-- **UI** with Streamlit
+A Generative AI–powered system designed to assist customer support executives in efficiently accessing and understanding information across multiple data sources. It enables natural language interaction with both structured customer data (such as profiles and support tickets) and unstructured content like policy documents. By combining these capabilities, the system delivers accurate, context-aware responses, improving productivity and enhancing the overall quality of customer support.
 
-This directly maps to the assignment requirements for natural language querying over SQL data and policy PDFs, plus LangChain/LangGraph, SQL DB, Vector DB, MCP server, and a UI. See the uploaded assignment PDF for the required scope. 
+---
 
-## Architecture
+## 1. Objective
 
-```text
-Streamlit UI
-   -> LangGraph Orchestrator
-      -> Intent Router
-      -> SQL Agent / Tool
-      -> Policy RAG Agent / Tool
-      -> Answer Synthesizer
+In this solution, the support executive can:
 
-Shared Resources:
-- SQLite database: structured customer data
-- FAISS vector store: embedded PDF chunks
-- MCP server: exposes sql_lookup and policy_search tools
-```
+- ask policy questions such as **"What is the current refund policy?"**
+- ask structured-data questions such as **"Give me a quick overview of customer Rachel Moore's profile and past support ticket details."**
+- ask hybrid questions such as **"Does Michael's latest complaint qualify for refund under the current refund policy?"**
 
-## Project structure
+---
 
-```text
-app/
-  config.py
-  llm.py
-  state.py
-  graph.py
-  retriever.py
-  db.py
-  mcp_server.py
-  tools/
-    sql_tool.py
-    policy_tool.py
-    response_tool.py
-scripts/
-  setup_data.py
-  ingest_policies.py
-streamlit_app.py
-requirements.txt
-.env.example
-```
+## 2. Project Overview:
 
-## Quick start
+1. User enters a question in Streamlit.
+2. `SupportMultiAgent` runs a LangGraph workflow.
+3. The system routes the user query into one of these paths:
 
-### 1) Create environment and install
+  - **Structured path** → fetches customer, ticket, and order data from SQL
+  - **Document path** → retrieves relevant policy chunks from the vector store
+  - **Hybrid path** → combines SQL evidence and policy evidence, then produces a grounded answer
+  - **Clarification path** → asks the user to clarify ambiguous requests
+
+4. The graph calls MCP tools:
+   - `sql_lookup`
+   - `policy_search`
+5. The final response is synthesized by the LLM using only the returned SQL and/or policy context.
+
+---
+
+## 3. Architecture
+![Project Architecture](assets/customer_support_architecture.svg)
+
+## 4. Tech stack
+
+### Core frameworks
+- LangChain
+- LangGraph
+- MCP Python SDK
+
+### Models
+- OpenAI chat model (default: `gpt-4o-mini`)
+- OpenAI embeddings (default: `text-embedding-3-small`)
+
+### Databases / storage
+- PostgreSQL for structured customer data
+- FAISS for vector retrieval over policy PDFs
+
+### UI
+- Streamlit
+
+---
+
+## 5. Setup instructions
+
+### Prerequisites
+
+Install the following first:
+
+- Python 3.10+
+- PostgreSQL
+- `pip`
+- OpenAI API key
+
+### Step 1: Create a virtual environment
+
+#### Windows
 ```bash
 python -m venv .venv
-source .venv/bin/activate   # or .venv\Scripts\activate on Windows
+.venv\Scripts\activate
+```
+
+#### macOS / Linux
+```bash
+python -m venv .venv
+source .venv/bin/activate
+```
+
+### Step 2: Install dependencies
+
+```bash
 pip install -r requirements.txt
-cp .env.example .env
-# add OPENAI_API_KEY to .env
 ```
 
-### 2) Generate synthetic SQL data and sample PDFs
+### Step 3: Set credentials in `.env`
+
+- Copy .env.example as .env
+- Replace with your credentials
+
+---
+
+## 6. Load the structured data into PostgreSQL
+
+### Run the SQL setup script
+
+In your terminal, excute the following:
+
 ```bash
-python scripts/setup_data.py
+set BASE= <path_to_customer_dataset(in data)_folder>
+psql -U postgres -f setup_database.sql -v customers_path="%BASE%\customers.csv" -v orders_path="%BASE%\orders.csv"  -v tickets_path="%BASE%\support_tickets.csv"
 ```
-psql -U postgres -f setup_database.sql -v customers_path="C:/path/to/customers_clean.csv" -v orders_path="C:/path/to/orders_clean.csv" -v tickets_path="C:/path/to/support_tickets_clean.csv"
-This creates:
-- `data/support.db`
-- sample policy PDFs under `policies/`
 
-### 3) Ingest PDFs into FAISS
+**Note**: On Windows, use forward slashes in the file paths.
+
+---
+
+## 7. Ingest policy PDFs into FAISS
+
+Place policy PDFs inside:
+
+```text
+data/policies/
+```
+
+Then run:
+
 ```bash
-python -m scripts.ingest_policies
+python scripts/ingest_policies.py
 ```
+---
 
-This creates:
-- `data/faiss_index/`
+## 8. Run the MCP server
 
-### 4) Run the Streamlit UI
-```bash
-streamlit run streamlit_app.py
-```
+The current implementation uses **streamable HTTP transport**, so start the MCP server first:
 
-### 5) Run the MCP server
 ```bash
 python -m app.mcp_server
 ```
 
-## Example questions
+The client expects the server at:
+
+```text
+http://127.0.0.1:8000/mcp
+```
+
+---
+
+## 9. Run the Streamlit application
+
+In a second terminal, run:
+
+```bash
+streamlit run streamlit_app.py
+```
+
+Then open the local Streamlit URL shown in the terminal.
+
+---
+
+## 10. Sample queries
+
+#### Policy-only
 - What is the current refund policy?
-- Give me a quick overview of customer Ema Johnson's profile and past support ticket details.
-- Does Ema's latest complaint qualify for refund under the current refund policy?
+- What does the cancellation policy say?
 
-## Methodology / design choices
-- **SQLite** for fast prototype setup. In production, this can be PostgreSQL or MySQL.
-- **FAISS** for a local vector DB. In production, this can be Pinecone, Weaviate, or Azure AI Search.
-- **LangGraph** for explicit control over routing and multi-step execution.
-- **MCP** for tool standardization and separation between the agent and external capabilities.
+#### Structured-data only
+- Give me a quick overview of customer Rachel Moore's profile and past support ticket details.
+- Show Michael's order history.
 
-## Tradeoffs
-- Multi-agent orchestration is more modular and explainable than a single monolithic prompt, but adds some latency.
-- Rule-based intent routing is simpler and faster, but LLM-based routing handles more natural variations. This project uses a lightweight hybrid approach.
-- Local FAISS is quick for demonstration, but managed vector stores scale better in production.
-
-## Demo video checklist
-Use these steps in your demo recording:
-1. Show generated tables in `data/support.db`
-2. Show sample PDFs under `policies/`
-3. Run `python scripts/ingest_policies.py`
-4. Run Streamlit app
-5. Ask one policy-only, one SQL-only, and one hybrid question
-6. Optionally show MCP server startup command
-
-## Notes for interview / submission
-If time is limited, submit the GitHub repo with:
-- working code
-- README
-- short Loom video URL added into README after recording
-
+#### Hybrid
+- Does Michael's latest complaint qualify for refund under the current refund policy?
+- Based on Rachel's latest ticket, what policy rule applies?

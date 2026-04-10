@@ -1,26 +1,3 @@
--- ============================================================
--- customer_support database setup + CSV load script for PostgreSQL
--- ============================================================
--- HOW TO RUN
--- 1) Open psql as a superuser or a user that can create databases:
---      psql -U postgres -f setup_database.sql \
---           -v customers_path='C:/path/to/customers_clean.csv' \
---           -v orders_path='C:/path/to/orders_clean.csv' \
---           -v tickets_path='C:/path/to/support_tickets_clean.csv'
---
--- 2) Use forward slashes in Windows paths.
--- 3) This script uses psql meta-commands like \copy and \connect.
---
--- WHAT THIS SCRIPT DOES
--- - Creates database: customer_support
--- - Creates staging tables for safe CSV import
--- - Loads the CSV files
--- - Creates final typed tables
--- - Inserts/casts data safely
--- - Adds primary keys, foreign keys, and indexes
--- - Prints row counts at the end
--- ============================================================
-
 \set ON_ERROR_STOP on
 
 -- =========================
@@ -192,8 +169,8 @@ SELECT
     NULLIF(TRIM(email), ''),
     NULLIF(TRIM(phone_number), ''),
     NULLIF(TRIM(gender), ''),
-    NULLIF(TRIM(dob), '')::DATE,
-    NULLIF(TRIM(signup_date), '')::DATE,
+	TO_DATE(NULLIF(TRIM(dob), ''), 'MM/DD/YYYY'),
+	TO_DATE(NULLIF(TRIM(signup_date), ''), 'MM/DD/YYYY'),
     NULLIF(TRIM(address), ''),
     NULLIF(TRIM(city), ''),
     NULLIF(TRIM(state), ''),
@@ -237,8 +214,8 @@ SELECT
     NULLIF(TRIM(ticket_id), '')::UUID,
     NULLIF(TRIM(customer_id), '')::UUID,
     NULLIF(TRIM(issue_type), ''),
-    NULLIF(TRIM(ticket_created), '')::TIMESTAMP,
-    NULLIF(TRIM(ticket_resolved), '')::TIMESTAMP,
+    TO_TIMESTAMP(NULLIF(TRIM(ticket_created), ''), 'MM/DD/YYYY HH24:MI'),
+    TO_TIMESTAMP(NULLIF(TRIM(ticket_resolved), ''), 'MM/DD/YYYY HH24:MI'),
     NULLIF(TRIM(resolution_time_hours), '')::NUMERIC(10,2),
     NULLIF(TRIM(sentiment), ''),
     NULLIF(TRIM(support_agent), '')
@@ -280,9 +257,9 @@ ORDER BY check_name;
 -- =========================
 -- 7) CLEANUP STAGING TABLES
 -- =========================
-DROP TABLE IF EXISTS staging_customers;
-DROP TABLE IF EXISTS staging_orders;
-DROP TABLE IF EXISTS staging_tickets;
+DROP TABLE IF EXISTS stg_customers;
+DROP TABLE IF EXISTS stg_orders;
+DROP TABLE IF EXISTS stg_support_tickets;
 
 \echo ============================================================
 \echo Database setup finished successfully.

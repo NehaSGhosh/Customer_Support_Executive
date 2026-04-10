@@ -1,6 +1,5 @@
 from app.tools.sql_tool import lookup_customer_support_data
 from app.tools.policy_tool import search_policy_knowledge
-from app.logger import logger
 
 try:
     from mcp.server.fastmcp import FastMCP

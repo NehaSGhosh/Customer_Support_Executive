@@ -9,7 +9,7 @@ from app.logger import logger
 
 def classify_intent(query: str) -> str:
     logger.info("NODE_START | classify_intent")
-    logger.info(f"STATE_IN | query={query}")
+    logger.debug(f"STATE_IN | query={query}")
 
     q = query.lower().strip()
 
@@ -148,7 +148,7 @@ class SupportMultiAgent:
 
         tools = list(state.get("tools_called", [])) + ["mcp.policy_search"]
 
-        logger.info(f"TOOL_RESULT | mcp.policy_search | preview={str(result)[:300]}")
+        logger.debug(f"TOOL_RESULT | mcp.policy_search | preview={str(result)[:300]}")
 
         return {
             **state,
@@ -177,8 +177,8 @@ class SupportMultiAgent:
 
     def answer(self, state: AgentState) -> AgentState:
         logger.info("NODE_START | answer")
-        logger.info(f"ANSWER_INPUT | sql_result={state.get('sql_result', {})}")
-        logger.info(f"ANSWER_INPUT | policy_result={state.get('policy_result', {})}")
+        logger.debug(f"ANSWER_INPUT | sql_result={state.get('sql_result', {})}")
+        logger.debug(f"ANSWER_INPUT | policy_result={state.get('policy_result', {})}")
 
 
         text = synthesize_answer(
@@ -188,7 +188,7 @@ class SupportMultiAgent:
             policy_result=state.get("policy_result", {}),
         )
 
-        logger.info(f"NODE_END | answer | preview={text[:300]}")
+        logger.debug(f"NODE_END | answer | preview={text[:300]}")
 
         return {
             **state,
@@ -198,11 +198,11 @@ class SupportMultiAgent:
     def run(self, query: str):
         logger.info("===================================================")
         logger.info("GRAPH_START")
-        logger.info(f"USER_QUERY | {query}")
+        logger.debug(f"USER_QUERY | {query}")
 
         result = self.graph.invoke({"query": query, "tools_called": []})
 
-        logger.info(f"GRAPH_END | final_answer={result.get('final_answer', '')[:300]}")
+        logger.debug(f"GRAPH_END | final_answer={result.get('final_answer', '')[:300]}")
         logger.info("===================================================")
 
         return result

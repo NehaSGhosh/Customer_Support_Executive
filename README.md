@@ -2,6 +2,8 @@
 
 A Generative AI–powered system designed to assist customer support executives in efficiently accessing and understanding information across multiple data sources. It enables natural language interaction with both structured customer data (such as profiles and support tickets) and unstructured content like policy documents. By combining these capabilities, the system delivers accurate, context-aware responses, improving productivity and enhancing the overall quality of customer support.
 
+
+Note: The dataset used in this project includes customer, order, and support ticket data sourced from [Kaggle](https://www.kaggle.com/datasets/vinaykandimalla/customer-360?resource=download) for the SQL database. The unstructured data consists of [Amazon return policy](https://www.amazon.ca/gp/help/customer/display.html?nodeId=GKM69DUUYKQWKWX7), [privacy policy](https://www.amazon.ca/gp/help/customer/display.html?nodeId=GX7NJQ4ZB8MHFRNJ), and [terms & conditions](https://www.amazon.ca/gp/help/customer/display.html?nodeId=GLSBYFE9MGKKQXXM) documents in PDF format.
 ---
 
 ## 1. Objective

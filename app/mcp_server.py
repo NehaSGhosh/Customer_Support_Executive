@@ -1,10 +1,8 @@
 """Minimal MCP server exposing the same tools used by the agent.
-
-Run with:
-    python -m app.mcp_server
 """
 from app.tools.sql_tool import lookup_customer_support_data
 from app.tools.policy_tool import search_policy_knowledge
+from app.logger import logger
 
 try:
     from mcp.server.fastmcp import FastMCP
@@ -29,4 +27,5 @@ def policy_search(query: str) -> dict:
 
 
 if __name__ == "__main__":
+    logger.info("MCP SERVER STARTING...")
     mcp.run()

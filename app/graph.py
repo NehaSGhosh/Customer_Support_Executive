@@ -2,8 +2,7 @@ from typing import Literal
 from langgraph.graph import END, START, StateGraph
 
 from app.state import AgentState
-from app.tools.sql_tool import lookup_customer_support_data
-from app.tools.policy_tool import search_policy_knowledge
+from app.mcp_client import call_tool
 from app.tools.response_tool import synthesize_answer
 from app.logger import logger
 
@@ -110,12 +109,15 @@ class SupportMultiAgent:
 
     def sql_agent(self, state: AgentState) -> AgentState:
         logger.info("NODE_START | sql_agent")
-        logger.info("TOOL_CALL | sql_lookup")
+        logger.info("TOOL_CALL | mcp.sql_lookup")
 
-        result = lookup_customer_support_data(state["query"])
-        tools = list(state.get("tools_called", [])) + ["sql_lookup"]
+        try:
+            result = call_tool("sql_lookup", {"query": state["query"]})
+        except Exception as exc:
+            logger.exception("TOOL_ERROR | mcp.sql_lookup failed")
+            result = {"error": f"sql_lookup failed: {str(exc)}"}
 
-        logger.info(f"TOOL_RESULT | sql_lookup | preview={str(result)[:300]}")
+        tools = list(state.get("tools_called", [])) + ["mcp.sql_lookup"]
 
         return {
             **state,
@@ -136,12 +138,17 @@ class SupportMultiAgent:
 
     def policy_agent(self, state: AgentState) -> AgentState:
         logger.info("NODE_START | policy_agent")
-        logger.info("TOOL_CALL | policy_search")
+        logger.info("TOOL_CALL | mcp.policy_search")
 
-        result = search_policy_knowledge(state["query"])
-        tools = list(state.get("tools_called", [])) + ["policy_search"]
+        try:
+            result = call_tool("policy_search", {"query": state["query"]})
+        except Exception as exc:
+            logger.exception("TOOL_ERROR | mcp.policy_search failed")
+            result = {"error": f"policy_search failed: {str(exc)}"}
 
-        logger.info(f"TOOL_RESULT | policy_search | preview={str(result)[:300]}")
+        tools = list(state.get("tools_called", [])) + ["mcp.policy_search"]
+
+        logger.info(f"TOOL_RESULT | mcp.policy_search | preview={str(result)[:300]}")
 
         return {
             **state,

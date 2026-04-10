@@ -30,7 +30,7 @@ OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
 EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "text-embedding-3-small")
 
 # Query validation
-MIN_QUERY_LENGTH = int(os.getenv("MIN_QUERY_LENGTH", "3"))
+MIN_QUERY_LENGTH = int(os.getenv("MIN_QUERY_LENGTH", "10"))
 MAX_QUERY_LENGTH = int(os.getenv("MAX_QUERY_LENGTH", "500"))
 
 # Retrieval settings

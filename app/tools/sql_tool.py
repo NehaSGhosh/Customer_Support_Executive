@@ -72,7 +72,7 @@ def extract_customer_query_info(query: str) -> Optional[str]:
     )
     return result
 
-def _query_customer_profile(first: str, customer_name: str):
+def _query_customer_profile(first: Optional[str], customer_name: str):
     if first:
         where_condition = "LOWER(c.first_name) = LOWER(%s)"
         match_name = first
@@ -84,6 +84,7 @@ def _query_customer_profile(first: str, customer_name: str):
         SELECT *
         FROM customers c
         WHERE {where_condition}
+        LIMIT 1
         """,
         (match_name,),
     )
@@ -98,17 +99,18 @@ def _query_customer_tickets(first: Optional[str], customer_name: str):
 
     return run_query(
         f"""
-        SELECT t.*
+        SELECT *
         FROM support_tickets t
         JOIN customers c ON c.customer_id = t.customer_id
         WHERE {where_condition}
         ORDER BY t.ticket_created DESC
+        LIMIT 4
         """,
         (match_name,),
     )
 
 
-def _query_customer_orders(first: str, last: Optional[str], customer_name: str):
+def _query_customer_orders(first: Optional[str], customer_name: str):
     if first:
         where_condition = "LOWER(c.first_name) = LOWER(%s)"
         match_name = first
@@ -117,11 +119,12 @@ def _query_customer_orders(first: str, last: Optional[str], customer_name: str):
         match_name = customer_name
     return run_query(
         f"""
-        SELECT o.*
+        SELECT *
         FROM orders o
         JOIN customers c ON c.customer_id = o.customer_id
         WHERE {where_condition}
         ORDER BY o.order_date DESC
+        LIMIT 4
         """,
         (match_name,),
     )

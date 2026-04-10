@@ -24,7 +24,7 @@ agent = SupportMultiAgent()
 sample_queries = [
     "What is the current refund policy?",
     "Give me a quick overview of customer Rachel Moore's profile and past support ticket details.",
-    "Does Michael's latest complaint qualify for refund under the current refund policy?",
+    "Does Michael still return his last order under the current refund policy?",
 ]
 
 with st.sidebar:
@@ -63,13 +63,15 @@ if run_clicked:
     else:
         st.session_state["is_running"] = True
         try:
+            result = {}
             with st.spinner("Thinking..."):
                 if not cleaned_query or len(cleaned_query.strip()) < MIN_QUERY_LENGTH:
-                    st.error("Please enter a valid question")
-                if len(cleaned_query) > MAX_QUERY_LENGTH:
-                    st.error("Query too long (max 1000 characters)")
-                result = agent.run(cleaned_query)
-                st.session_state["last_submit_time"] = time.time()
+                    st.error(f"Please enter a valid question (min {MIN_QUERY_LENGTH} character needed).")
+                elif len(cleaned_query) > MAX_QUERY_LENGTH:
+                    st.error(f"Query too long (max {MAX_QUERY_LENGTH} characters).")
+                else:
+                    result = agent.run(cleaned_query)
+                    st.session_state["last_submit_time"] = time.time()
 
             st.subheader("Answer")
             st.write(result.get("final_answer", "No answer was generated."))

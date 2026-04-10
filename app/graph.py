@@ -10,16 +10,35 @@ from app.llm import safe_llm_call, get_llm
 def classify_intent(query: str) -> str:
     llm = get_llm()
     prompt = f"""
-        Classify the user query into exactly one of these labels:
-        - structured: for customer, ticket, order, account, or profile data
-        - document: for policy, refund policy, privacy policy, cancellation policy, terms, or document lookup
-        - hybrid: if both structured data and policy/document reasoning are needed
-        - clarify: if the query is too vague or ambiguous
+Classify the user query into exactly one of these labels:
 
-        Return only one label.
+- structured:
+  Queries about customer data, ticket, order, account, profile, complaint, or support history.
+  These are fulfilled entirely using database (SQL) data.
 
-        Query: {query}
-        """
+- document:
+  Queries about policies, such as refund policy, privacy policy, cancellation, return policy, or terms.
+
+- hybrid:
+  ONLY if the query requires BOTH:
+  1) customer/order/ticket data AND
+  2) policy/document reasoning
+
+  Example:
+  - "Does Rachel Moore's complaint qualify for a refund?" → hybrid
+
+IMPORTANT RULES:
+- Asking for profile, tickets, or orders together is STILL structured
+- Multiple structured data types do NOT make it hybrid
+- Only choose hybrid if policy or document reasoning is explicitly required
+
+- clarify:
+  If the query is vague or unclear
+
+Return only one label.
+
+Query: {query}
+"""
     response = safe_llm_call(lambda: llm.invoke(prompt)).content.strip().lower()
 
     allowed = {"structured", "document", "hybrid", "clarify"}

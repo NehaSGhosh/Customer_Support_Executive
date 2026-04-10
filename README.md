@@ -174,11 +174,11 @@ Then open the local Streamlit URL shown in the terminal.
 
 #### Structured-data only
 - Give me a quick overview of customer Rachel Moore's profile and past support ticket details.
-- Show Michael's order history.
+- What did Stephen Smith buy recently?
 
 #### Hybrid
-- Does Michael's latest complaint qualify for refund under the current refund policy?
-- Based on Rachel's latest ticket, what policy rule applies?
+- Does Michael still return his last order under the current refund policy?
+- Based on Shannon's latest ticket, what policy rule applies?
 
 #### Clarify
 - Talk to customer care

@@ -1,8 +1,10 @@
 from typing import Any, Dict
+from app.logger import logger
 from app.llm import get_llm,safe_llm_call
 
 def synthesize_answer(query: str, sql_result: Dict[str, Any], policy_result: Dict[str, Any]) -> str:
     llm = get_llm()
+    
     prompt = f"""
         You are a grounded customer support assistant.
 
@@ -26,5 +28,5 @@ def synthesize_answer(query: str, sql_result: Dict[str, Any], policy_result: Dic
         - State whether the complaint qualifies, does not qualify, or cannot be determined.
         - If SQL result contains tickets/orders, include them explicitly in the answer.
         """
-
+    logger.debug(f"Prompt: {prompt}")
     return safe_llm_call(lambda: llm.invoke(prompt)).content

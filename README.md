@@ -101,6 +101,7 @@ In your terminal, excute the following:
 
 ```bash
 set BASE= <path_to_customer_dataset(in data)_folder>
+
 psql -U postgres -f setup_database.sql -v customers_path="%BASE%\customers.csv" -v orders_path="%BASE%\orders.csv"  -v tickets_path="%BASE%\support_tickets.csv"
 ```
 
@@ -119,11 +120,25 @@ data/policies/
 Then run:
 
 ```bash
-python scripts/ingest_policies.py
+python -m scripts.ingest_policies
 ```
 ---
 
-## 8. Run the MCP server
+## 8. Run the tests
+
+Run the following command:
+
+```bash
+pytest -q tests
+```
+
+**Note:**
+
+- The tests use mocks and stubs so they do not call real OpenAI, PostgreSQL, FAISS, MCP, or Streamlit services.
+- This keeps the suite fast, deterministic, and suitable for local development as well as CI.
+
+
+## 9. Run the MCP server
 
 The current implementation uses **streamable HTTP transport**, so start the MCP server first:
 
@@ -139,7 +154,7 @@ http://127.0.0.1:8000/mcp
 
 ---
 
-## 9. Run the Streamlit application
+## 10. Run the Streamlit application
 
 In a second terminal, run:
 
@@ -151,7 +166,7 @@ Then open the local Streamlit URL shown in the terminal.
 
 ---
 
-## 10. Sample queries
+## 11. Sample queries
 
 #### Policy-only
 - What is the current refund policy?
@@ -164,3 +179,6 @@ Then open the local Streamlit URL shown in the terminal.
 #### Hybrid
 - Does Michael's latest complaint qualify for refund under the current refund policy?
 - Based on Rachel's latest ticket, what policy rule applies?
+
+#### Clarify
+- Talk to customer care

@@ -5,34 +5,27 @@ from app.state import AgentState
 from app.mcp_client import call_tool
 from app.tools.response_tool import synthesize_answer
 from app.logger import logger
-
+from app.llm import safe_llm_call, get_llm
 
 def classify_intent(query: str) -> str:
-    logger.info("NODE_START | classify_intent")
-    logger.debug(f"STATE_IN | query={query}")
+    llm = get_llm()
+    prompt = f"""
+        Classify the user query into exactly one of these labels:
+        - structured: for customer, ticket, order, account, or profile data
+        - document: for policy, refund policy, privacy policy, cancellation policy, terms, or document lookup
+        - hybrid: if both structured data and policy/document reasoning are needed
+        - clarify: if the query is too vague or ambiguous
 
-    q = query.lower().strip()
+        Return only one label.
 
-    doc_words = ["policy", "refund", "privacy", "cancellation", "document", "terms", "return"]
-    sql_words = [
-        "customer", "profile", "ticket", "history", "account", "complaint",
-        "order", "status", "email", "phone", "ema", "ravi", "lisa"
-    ]
+        Query: {query}
+        """
+    response = safe_llm_call(lambda: llm.invoke(prompt)).content.strip().lower()
 
-    has_doc = any(w in q for w in doc_words)
-    has_sql = any(w in q for w in sql_words)
-
-    if has_doc and has_sql:
-        intent = "hybrid"
-    elif has_doc:
-        intent = "document"
-    elif has_sql:
-        intent = "structured"
-    else:
-        intent = "clarify"
-
-    logger.info(f"DECISION | classify_intent -> {intent}")
-    return intent
+    allowed = {"structured", "document", "hybrid", "clarify"}
+    if response not in allowed:
+        return "clarify"
+    return response
 
 
 class SupportMultiAgent:
@@ -160,12 +153,12 @@ class SupportMultiAgent:
         logger.info("NODE_START | clarify")
 
         follow_up = (
-            "I’m not fully sure what you want yet. "
+            "I want to make sure I understand your request correctly. Please clarify a bit more.\n\n"
             "Are you asking about customer/order data, policy documents, or both? "
             "For example, you can ask:\n"
-            "- 'Show Ema’s profile and past tickets'\n"
+            "- 'Show Michael's profile and past tickets'\n"
             "- 'What is the refund policy?'\n"
-            "- 'Does Ema’s recent complaint qualify for refund?'"
+            "- 'Does Rachel’s recent complaint qualify for refund?'"
         )
 
         logger.info("NODE_END | clarify")
@@ -183,7 +176,6 @@ class SupportMultiAgent:
 
         text = synthesize_answer(
             query=state["query"],
-            intent=state["intent"],
             sql_result=state.get("sql_result", {}),
             policy_result=state.get("policy_result", {}),
         )

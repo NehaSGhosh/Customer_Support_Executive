@@ -1,9 +1,8 @@
 from typing import Any, Dict, Optional
-from app.db import run_query
+from app.db import DatabaseConnectionError, DatabaseQueryError, run_query
 from app.logger import logger
-from app.llm import get_llm
+from app.llm import get_llm,safe_llm_call
 from pydantic import BaseModel, Field
-import time
 
 class CustomerQueryExtraction(BaseModel):
     customer_name: Optional[str] = Field(
@@ -22,18 +21,6 @@ class CustomerQueryExtraction(BaseModel):
         default=False,
         description="Whether the user is asking for order details."
     )
-
-def safe_llm_call(fn, retries=3):
-    for i in range(retries):
-        try:
-            return fn()
-        except Exception as e:
-            if "rate_limit" in str(e):
-                logger.info(f"Retrying LLM call: {i}")
-                time.sleep(2 ** i)
-            else:
-                raise
-    raise Exception("LLM failed after retries")
 
 def extract_customer_query_info(query: str) -> Optional[str]:
     logger.info("LLM_CALL | extracting customer name and requested sections from query")
@@ -85,80 +72,130 @@ def extract_customer_query_info(query: str) -> Optional[str]:
     )
     return result
 
-def lookup_customer_support_data(query: str) -> Dict[str, Any]:
-    logger.info("TOOL_CALL | SQL tool invoked")
-    extracted = extract_customer_query_info(query)
-    customer_name = extracted.customer_name.strip() if extracted.customer_name else None
+def _query_customer_profile(first: str, customer_name: str):
+    if first:
+        where_condition = "LOWER(c.first_name) = LOWER(%s)"
+        match_name = first
+    else:
+        where_condition = "LOWER(c.first_name || ' ' || c.last_name) = LOWER(%s)"
+        match_name = customer_name
+    return run_query(
+        f"""
+        SELECT *
+        FROM customers c
+        WHERE {where_condition}
+        """,
+        (match_name,),
+    )
 
-    if customer_name:
-        logger.info(f"CUSTOMER_MATCH | {customer_name}")
-        parts = customer_name.split()
-        first = parts[0]
-        last = parts[1] if len(parts) > 1 else None
-        response: Dict[str, Any] = {}
+def _query_customer_tickets(first: Optional[str], customer_name: str):
+    if first:
+        where_condition = "LOWER(c.first_name) = LOWER(%s)"
+        match_name = first
+    else:
+        where_condition = "LOWER(c.first_name || ' ' || c.last_name) = LOWER(%s)"
+        match_name = customer_name
 
-        if extracted.include_profile:
-            customer = run_query(
-                """
-                SELECT *
-                FROM customers
-                WHERE 
-                    LOWER(first_name) = LOWER(%s)
-                    OR LOWER(last_name) = LOWER(%s)
-                    OR LOWER(first_name || ' ' || last_name) = LOWER(%s)
-                """,
-                (first, last, customer_name),
-            )
-            response["customer"] = customer[0] if customer else {}
+    return run_query(
+        f"""
+        SELECT t.*
+        FROM support_tickets t
+        JOIN customers c ON c.customer_id = t.customer_id
+        WHERE {where_condition}
+        ORDER BY t.ticket_created DESC
+        """,
+        (match_name,),
+    )
 
-        if extracted.include_tickets:
-            tickets = run_query(
-                """
-                SELECT t.*
-                FROM support_tickets t
-                JOIN customers c ON c.customer_id = t.customer_id
-                WHERE 
-                    LOWER(c.first_name) = LOWER(%s)
-                    OR LOWER(c.last_name) = LOWER(%s)
-                    OR LOWER(c.first_name || ' ' || c.last_name) = LOWER(%s)
-                ORDER BY t.ticket_created DESC
-                """,
-                (first, last, customer_name),
-            )
-            response["tickets"] = tickets
 
-        if extracted.include_orders:
-            orders = run_query(
-                """
-                SELECT o.*
-                FROM orders o
-                JOIN customers c ON c.customer_id = o.customer_id
-                WHERE 
-                    LOWER(c.first_name) = LOWER(%s)
-                    OR LOWER(c.last_name) = LOWER(%s)
-                    OR LOWER(c.first_name || ' ' || c.last_name) = LOWER(%s)
-                ORDER BY o.order_date DESC
-                """,
-                (first, last, customer_name),
-            )
-            response["orders"] = orders
+def _query_customer_orders(first: str, last: Optional[str], customer_name: str):
+    if first:
+        where_condition = "LOWER(c.first_name) = LOWER(%s)"
+        match_name = first
+    else:
+        where_condition = "LOWER(c.first_name || ' ' || c.last_name) = LOWER(%s)"
+        match_name = customer_name
+    return run_query(
+        f"""
+        SELECT o.*
+        FROM orders o
+        JOIN customers c ON c.customer_id = o.customer_id
+        WHERE {where_condition}
+        ORDER BY o.order_date DESC
+        """,
+        (match_name,),
+    )
 
-        logger.info(
-            "TOOL_RESULT | SQL | "
-            f"keys_returned={list(response.keys())}"
-        )
 
-        return response
-
-    logger.info("CUSTOMER_MATCH | none")
-    logger.info("FALLBACK | returning generic support summary")
-
-    open_tickets = run_query(
+def _query_open_ticket_summary():
+    return run_query(
         """
         SELECT COUNT(*) AS open_tickets
         FROM support_tickets
         """
     )
 
-    logger.info(f"TOOL_RESULT | SQL fallback | rows={len(open_tickets)}")
-    return {"summary": open_tickets[0] if open_tickets else {}}
+def lookup_customer_support_data(query: str) -> Dict[str, Any]:
+    logger.info("TOOL_CALL | SQL tool invoked")
+
+    try:
+        extracted = extract_customer_query_info(query)
+    except Exception as exc:
+        logger.exception("Failed to extract structured customer query info")
+        return {
+            "error": "Could not interpret the customer lookup request.",
+            "summary": {},
+        }
+
+    customer_name = extracted.customer_name.strip() if extracted.customer_name else None
+
+    try:
+        if customer_name:
+
+            logger.info("CUSTOMER_MATCH | %s", customer_name)
+            parts = customer_name.split()
+            first = parts[0] if len(parts) == 1 else None
+
+            response: Dict[str, Any] = {"error": None}
+
+            if extracted.include_profile:
+                customer = _query_customer_profile(first, customer_name)
+                response["customer"] = customer[0] if customer else {}
+
+            if extracted.include_tickets:
+                tickets = _query_customer_tickets(first, customer_name)
+                response["tickets"] = tickets
+
+            if extracted.include_orders:
+                orders = _query_customer_orders(first, customer_name)
+                response["orders"] = orders
+
+            logger.info("TOOL_RESULT | SQL | keys_returned=%s", list(response.keys()))
+            return response
+
+        logger.info("CUSTOMER_MATCH | none")
+        logger.info("FALLBACK | returning generic support summary")
+        open_tickets = _query_open_ticket_summary()
+        logger.info("TOOL_RESULT | SQL fallback | rows=%s", len(open_tickets))
+        return {
+            "summary": open_tickets[0] if open_tickets else {},
+            "error": None,
+        }
+    except DatabaseConnectionError as exc:
+        logger.warning("Database unavailable during SQL tool call: %s", exc)
+        return {
+            "error": "Database is temporarily unavailable.",
+            "summary": {},
+        }
+    except DatabaseQueryError as exc:
+        logger.warning("Database query failed during SQL tool call: %s", exc)
+        return {
+            "error": "Could not complete the database lookup.",
+            "summary": {},
+        }
+    except Exception as exc:
+        logger.exception("Unexpected SQL tool failure")
+        return {
+            "error": "Unexpected error while retrieving customer support data.",
+            "summary": {},
+        }
